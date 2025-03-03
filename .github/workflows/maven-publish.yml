@@ -44,17 +44,3 @@ jobs:
 
       - name: Run tests with Maven using H2 test profile
         run: mvn test --no-transfer-progress -Dspring.profiles.active=test
-
-  docker:
-    runs-on: ubuntu-latest
-    needs: [test]
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-
-      # Removed the Docker login step for testing purposes.
-      - name: Build Docker image using Docker Compose
-        run: docker-compose -f docker-compose.yml build

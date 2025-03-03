@@ -7,7 +7,7 @@ LABEL authors="yuqi.guo17@gmail.com"
 WORKDIR /app
 
 # Copy the jar file to the container
-COPY target/user-service-0.0.1-SNAPSHOT.jar /app/app.jar
+COPY target/group-manage-service-0.0.1-SNAPSHOT.jar /app/app.jar
 
 # Copy the application-docker.properties file to the container
 COPY src/main/resources/application-docker.properties /app/application-docker.properties
