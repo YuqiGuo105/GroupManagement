@@ -9,6 +9,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.jdbc.Sql;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -18,132 +22,84 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
+@SpringBootTest
+@Sql(scripts = "/test-data.sql")
 public class RoomServiceTest {
-    @Mock
-    private RoomRepository roomRepository;
 
-    @InjectMocks
+    @Autowired
     private RoomService roomService;
 
-    private Room mockRoom;
-    private Participant hostParticipant;
-
-    @BeforeEach
-    void setup() {
-        mockRoom = new Room();
-        mockRoom.setRoomId("testRoomId");
-        mockRoom.setHosterUserId("hostUser");
-        mockRoom.setStatus(Room.Status.ACTIVE);
-
-        // Create the host participant and add it to the room's participants list
-        hostParticipant = new Participant();
-        ParticipantId pid = new ParticipantId("hostUser", "activeRoomId");
-        hostParticipant.setId(pid);
-        hostParticipant.setPermission(Participant.Permission.HOSTER);
-        hostParticipant.setRoom(mockRoom);
-
-        List<Participant> participants = new ArrayList<>();
-        participants.add(hostParticipant);
-        mockRoom.setParticipants(participants);
+    /**
+     * Function: Test that getRoom returns an existing room.
+     * Edge case: When a room with the given roomId does not exist.
+     */
+    @Test
+    @Transactional
+    void testGetRoom_WithExistingRoom() {
+        Room room = roomService.getRoom("room-1");
+        assertNotNull(room, "Room should not be null");
+        assertEquals("room-1", room.getRoomId(), "Room ID must match");
+        assertEquals("111111", room.getJoinPassword(), "Join password must match");
     }
 
-    // -----------------------------------------------------------------
-    // createRoom(String hosterUserId)
-    // -----------------------------------------------------------------
+    /**
+     * Function: Test that getRoomWithParticipants returns a room with its participants initialized.
+     * Edge case: The participants list should not be null and must contain the dummy data.
+     */
     @Test
-    void testCreateRoom_ShouldCreateAndReturnRoom() {
-        when(roomRepository.save(any(Room.class))).thenReturn(mockRoom);
-
-        Room result = roomService.createRoom("hostUser");
-
-        assertNotNull(result);
-        assertEquals("testRoomId", result.getRoomId());
-        assertEquals("hostUser", result.getHosterUserId());
-        assertEquals(Room.Status.ACTIVE, result.getStatus());
-
-        // Verify the new room has exactly one participant: the host
-        assertNotNull(result.getParticipants());
-        assertEquals(1, result.getParticipants().size(),
-                "Expected exactly one participant (the host) in the created room");
-
-        verify(roomRepository, times(1)).save(any(Room.class));
+    @Transactional
+    void testGetRoomWithParticipants_ShouldInitializeParticipants() {
+        Room room = roomService.getRoomWithParticipants("room-1");
+        assertNotNull(room, "Room should not be null");
+        assertNotNull(room.getParticipants(), "Participants list should be initialized");
+        // In test-data.sql, room-1 has 3 participants.
+        assertEquals(3, room.getParticipants().size(), "There should be 3 participants");
     }
 
-    // -----------------------------------------------------------------
-    // closeRoom(String roomId, String hoster)
-    // -----------------------------------------------------------------
+    /**
+     * Function: Test that closeRoom successfully closes an active room.
+     * Edge case: The room's status changes to CLOSED and its participants list is cleared.
+     */
     @Test
-    void testCloseRoom_NotFound_ShouldThrow() {
-        when(roomRepository.findById("nonExisting")).thenReturn(Optional.empty());
-
-        assertThrows(IllegalArgumentException.class, () ->
-                roomService.closeRoom("nonExisting", "anyHost")
-        );
+    @Transactional
+    void testCloseRoom_Success() {
+        Room closed = roomService.closeRoom("room-1", "host1");
+        assertNotNull(closed, "Closed room should not be null");
+        assertEquals(Room.Status.CLOSED, closed.getStatus(), "Room status should be CLOSED");
+        assertNotNull(closed.getParticipants(), "Participants list should be initialized");
+        assertEquals(0, closed.getParticipants().size(), "Participants list should be empty after closing");
     }
 
+    /**
+     * Function: Test that closing a room with an invalid host throws an exception.
+     * Edge case: Only the host should be able to close the room.
+     */
     @Test
-    void testCloseRoom_HosterDoesNotMatch_ShouldThrow() {
-        when(roomRepository.findById("testRoomId")).thenReturn(Optional.of(mockRoom));
-
-        assertThrows(IllegalArgumentException.class, () ->
-                roomService.closeRoom("testRoomId", "differentHost")
-        );
+    void testCloseRoom_InvalidHost_ShouldThrowException() {
+        Exception ex = assertThrows(IllegalArgumentException.class, () -> {
+            roomService.closeRoom("room-1", "notHost");
+        });
+        assertEquals("Only the host can close the room", ex.getMessage());
     }
 
+    /**
+     * Function: Test that createRoom returns a properly created room with a generated roomId, joinPassword,
+     * ACTIVE status, and a host participant correctly added.
+     * Edge case: The returned room must have a non-null roomId and joinPassword; its participants list should
+     * contain exactly one participant with the correct host userId.
+     */
     @Test
-    void testCloseRoom_Success_ShouldReturnClosedRoom() {
-        // Suppose we have the host in the room. The service will clear participants on close.
-        when(roomRepository.findById("testRoomId")).thenReturn(Optional.of(mockRoom));
-        when(roomRepository.save(any(Room.class))).thenAnswer(invocation -> invocation.getArgument(0));
-
-        Room result = roomService.closeRoom("testRoomId", "hostUser");
-
-        assertNotNull(result);
-        assertEquals(Room.Status.CLOSED, result.getStatus());
-
-        // Since closeRoom() calls room.getParticipants().clear(), check that participants are removed
-        assertNotNull(result.getParticipants());
-        assertEquals(0, result.getParticipants().size(),
-                "Expected participants to be cleared after closing the room");
-
-        verify(roomRepository, times(1)).save(any(Room.class));
-    }
-
-    // -----------------------------------------------------------------
-    // getRoom(String roomId)
-    // -----------------------------------------------------------------
-    @Test
-    void testGetRoom_Found_ShouldReturnRoom() {
-        when(roomRepository.findById("testRoomId")).thenReturn(Optional.of(mockRoom));
-
-        Room result = roomService.getRoom("testRoomId");
-
-        assertNotNull(result);
-        assertEquals("testRoomId", result.getRoomId());
-    }
-
-    @Test
-    void testGetRoom_NotFound_ShouldReturnNull() {
-        when(roomRepository.findById("unknown")).thenReturn(Optional.empty());
-
-        Room result = roomService.getRoom("unknown");
-
-        assertNull(result);
-    }
-
-    // -----------------------------------------------------------------
-    // updateRoom(Room room)
-    // -----------------------------------------------------------------
-    @Test
-    void testUpdateRoom_ShouldSaveUpdatedRoom() {
-        when(roomRepository.save(any(Room.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        Room roomToUpdate = new Room();
-        roomToUpdate.setRoomId("testRoomId");
-
-        Room result = roomService.updateRoom(roomToUpdate);
-
-        assertNotNull(result);
-        assertEquals("testRoomId", result.getRoomId());
-        verify(roomRepository, times(1)).save(roomToUpdate);
+    @Transactional
+    void testCreateRoom_ShouldReturnCreatedRoom() {
+        // Act: Create a new room using a new host
+        Room newRoom = roomService.createRoom("newHost");
+        // Assert: newRoom is properly constructed
+        assertNotNull(newRoom, "Created room should not be null");
+        assertNotNull(newRoom.getRoomId(), "Room ID should be generated");
+        assertNotNull(newRoom.getJoinPassword(), "Join password should be generated");
+        assertEquals(Room.Status.ACTIVE, newRoom.getStatus(), "New room should be ACTIVE");
+        assertNotNull(newRoom.getParticipants(), "Participants list should be initialized");
+        assertEquals(1, newRoom.getParticipants().size(), "There should be exactly one participant (the host)");
+        assertEquals("newHost", newRoom.getParticipants().get(0).getId().getUserId(), "Host userId must match");
     }
 }

@@ -5,6 +5,7 @@ on:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
+  workflow_dispatch:
 
 jobs:
   build:
@@ -26,6 +27,7 @@ jobs:
           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-maven-
 
+      # Build the application, skipping tests for the build job.
       - name: Build with Maven (skip tests)
         run: mvn clean package --no-transfer-progress -DskipTests
 
@@ -42,5 +44,6 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      # Run tests with Maven using the H2 test profile.
       - name: Run tests with Maven using H2 test profile
         run: mvn test --no-transfer-progress -Dspring.profiles.active=test
