@@ -1,7 +1,10 @@
 package org.example.groupmanageservice.service;
 
 import jakarta.persistence.EntityNotFoundException;
+import org.example.groupmanageservice.config.RabbitConfig;
+import org.example.groupmanageservice.modules.EventType;
 import org.example.groupmanageservice.modules.Participant;
+import org.example.groupmanageservice.modules.RoomEventPayload;
 import org.example.groupmanageservice.modules.domain.ParticipantId;
 import org.springframework.cache.annotation.Cacheable;
 import org.example.groupmanageservice.dao.RoomRepository;
@@ -10,7 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
+import org.springframework.amqp.core.AmqpTemplate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Optional;
@@ -21,6 +24,9 @@ import java.util.UUID;
 public class RoomService {
     @Autowired
     private RoomRepository roomRepository;
+
+    @Autowired
+    private AmqpTemplate amqpTemplate;
 
     /**
      * Creates a new room by generating a unique roomId and a random join password.
@@ -87,7 +93,7 @@ public class RoomService {
     // Use this method when you need to work with participants and ensure they are initialized.
     @Transactional
     public Room getRoomWithParticipants(String roomId) {
-        Room room = roomRepository.findById(roomId).orElse(null);
+        Room room = roomRepository.findByIdWithParticipants(roomId).orElse(null);
         if (room != null) {
             // Force initialization of participants
             room.getParticipants().size();
@@ -113,5 +119,17 @@ public class RoomService {
     @CacheEvict(value = "rooms", key = "#roomId")
     public void deleteRoom(String roomId) {
         roomRepository.deleteById(roomId);
+    }
+
+    // Helper to publish event with the enum
+    private void publishEvent(EventType eventType, String roomId, String userId) {
+        RoomEventPayload payload = new RoomEventPayload(eventType, roomId, userId);
+
+        // Send to RabbitMQ topic exchange (if using Rabbit)
+        amqpTemplate.convertAndSend(RabbitConfig.ROOM_EXCHANGE, RabbitConfig.ROUTING_KEY, payload);
+
+        // If you plan to handle it with Spring ApplicationEvent instead, do something like:
+        // eventPublisher.publishEvent(payload);
+        // (But since you requested "focus on building the event and channels," we keep it simple.)
     }
 }

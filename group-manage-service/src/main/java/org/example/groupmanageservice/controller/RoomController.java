@@ -100,7 +100,7 @@ public class RoomController {
     public ResponseEntity<String> leaveRoom(
             @Parameter(description = "Room ID", required = true) @RequestParam String roomId,
             @Parameter(description = "User ID leaving the room", required = true) @RequestParam String userId) {
-        Room room = roomService.getRoom(roomId);
+        Room room = roomService.getRoomWithParticipants(roomId);
         if (room == null) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Room not found");
         }

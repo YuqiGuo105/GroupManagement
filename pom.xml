@@ -10,6 +10,7 @@
 
     <modules>
         <module>group-manage-service</module>
+        <module>gateway-layer</module>
     </modules>
 
     <properties>
