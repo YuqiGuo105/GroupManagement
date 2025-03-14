@@ -24,6 +24,16 @@ services:
     volumes:
       - redis-data:/data
 
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+    ports:
+      - "5672:5672"  # RabbitMQ message broker port
+      - "15672:15672"  # RabbitMQ Management UI port
+
   group-manage-service:
     build: ./group-manage-service
     container_name: group-manage-service
