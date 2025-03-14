@@ -1,5 +1,6 @@
 package org.example.groupmanageservice.service;
 
+import jakarta.persistence.EntityNotFoundException;
 import org.example.groupmanageservice.modules.Participant;
 import org.example.groupmanageservice.modules.domain.ParticipantId;
 import org.springframework.cache.annotation.Cacheable;
@@ -97,8 +98,15 @@ public class RoomService {
     // Update room details and update the cache.
     @CachePut(value = "rooms", key = "#room.roomId")
     public Room updateRoom(Room room) {
-        room.setUpdatedAt(LocalDateTime.now());
-        return roomRepository.save(room);
+        // Reload the existing Room from the database
+        Room existingRoom = roomRepository.findById(room.getRoomId())
+                .orElseThrow(() -> new EntityNotFoundException("Room not found: " + room.getRoomId()));
+
+        // Update only the fields that need to change
+        existingRoom.setUpdatedAt(LocalDateTime.now());
+        // (Update other fields if needed, but be careful with associations)
+
+        return roomRepository.save(existingRoom);
     }
 
     // Delete room from DB and evict it from cache.
