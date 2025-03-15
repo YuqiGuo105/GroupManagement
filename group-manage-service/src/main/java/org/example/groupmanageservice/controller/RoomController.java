@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.example.groupmanageservice.modules.EventType;
 import org.example.groupmanageservice.modules.Participant;
 import org.example.groupmanageservice.modules.Room;
 import org.example.groupmanageservice.modules.domain.ParticipantId;
@@ -84,6 +85,10 @@ public class RoomController {
         // Add participant to the room and update the room in DB/cache
         room.getParticipants().add(newParticipant);
         roomService.updateRoom(room);
+
+        // Publish the USER_JOINED event
+        roomService.publishEvent(EventType.USER_JOINED, roomId, userId);
+
         return ResponseEntity.ok("User joined room successfully");
     }
 
@@ -122,14 +127,25 @@ public class RoomController {
                 newHost.setPermission(Participant.Permission.HOSTER);
                 room.setHosterUserId(newHost.getId().getUserId());
                 participantService.updateParticipant(newHost);
+
+                // Publish HOST_CHANGE event for the new host
+                roomService.publishEvent(EventType.HOST_CHANGE, roomId, newHost.getId().getUserId());
             } else {
                 room.setStatus(Room.Status.CLOSED);
                 room.getParticipants().clear();
                 roomService.updateRoom(room);
+
+                // Publish ROOM_CLOSED event as room is empty
+                roomService.publishEvent(EventType.ROOM_CLOSED, roomId, userId);
+
                 return ResponseEntity.ok("Room deleted as it is empty");
             }
         }
+
         roomService.updateRoom(room);
+        // For non-host leaving, publish USER_LEFT event
+        roomService.publishEvent(EventType.USER_LEFT, roomId, userId);
+
         return ResponseEntity.ok("User left room successfully");
     }
 
@@ -148,6 +164,10 @@ public class RoomController {
             @Parameter(description = "User ID of the host", required = true) @RequestParam String hoster) {
         try {
             Room updatedRoom = roomService.closeRoom(roomId, hoster);
+
+            // Publish ROOM_CLOSED event
+            roomService.publishEvent(EventType.ROOM_CLOSED, roomId, hoster);
+
             return ResponseEntity.ok("Room closed successfully");
         } catch (IllegalArgumentException ex) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ex.getMessage());

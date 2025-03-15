@@ -2,15 +2,13 @@ package org.example.groupmanageservice.service;
 
 import jakarta.persistence.EntityNotFoundException;
 import org.example.groupmanageservice.config.RabbitConfig;
-import org.example.groupmanageservice.modules.EventType;
-import org.example.groupmanageservice.modules.Participant;
-import org.example.groupmanageservice.modules.RoomEventPayload;
+import org.example.groupmanageservice.modules.*;
 import org.example.groupmanageservice.modules.domain.ParticipantId;
 import org.springframework.cache.annotation.Cacheable;
 import org.example.groupmanageservice.dao.RoomRepository;
-import org.example.groupmanageservice.modules.Room;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.*;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.amqp.core.AmqpTemplate;
@@ -19,6 +17,8 @@ import java.util.ArrayList;
 import java.util.Optional;
 import java.util.Random;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 public class RoomService {
@@ -27,6 +27,11 @@ public class RoomService {
 
     @Autowired
     private AmqpTemplate amqpTemplate;
+
+    @Autowired
+    private ApplicationEventPublisher applicationEventPublisher;
+
+    private static final Logger logger = LoggerFactory.getLogger(RoomService.class);
 
     /**
      * Creates a new room by generating a unique roomId and a random join password.
@@ -121,15 +126,23 @@ public class RoomService {
         roomRepository.deleteById(roomId);
     }
 
-    // Helper to publish event with the enum
-    private void publishEvent(EventType eventType, String roomId, String userId) {
+    /**
+     * Helper method to publish and broadcast an event.
+     * This method publishes the event payload to RabbitMQ and broadcasts a RoomEvent
+     * via Spring's ApplicationEventPublisher.
+     */
+    public void publishEvent(EventType eventType, String roomId, String userId) {
         RoomEventPayload payload = new RoomEventPayload(eventType, roomId, userId);
-
-        // Send to RabbitMQ topic exchange (if using Rabbit)
-        amqpTemplate.convertAndSend(RabbitConfig.ROOM_EXCHANGE, RabbitConfig.ROUTING_KEY, payload);
-
-        // If you plan to handle it with Spring ApplicationEvent instead, do something like:
-        // eventPublisher.publishEvent(payload);
-        // (But since you requested "focus on building the event and channels," we keep it simple.)
+        try {
+            amqpTemplate.convertAndSend(RabbitConfig.ROOM_EXCHANGE, RabbitConfig.ROUTING_KEY, payload);
+            logger.info("Published event to RabbitMQ: {}", payload);
+        } catch (Exception ex) {
+            logger.error("Failed to publish event to RabbitMQ", ex);
+        }
+        // Broadcast the event via Spring's ApplicationEventPublisher
+        RoomEvent roomEvent = new RoomEvent(this, eventType, roomId, userId);
+        applicationEventPublisher.publishEvent(roomEvent);
+        logger.info("Broadcasted event: {}", roomEvent);
     }
+
 }
