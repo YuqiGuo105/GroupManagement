@@ -58,19 +58,18 @@ services:
 
   gateway-layer:
     build:
-      context: .
-      dockerfile: ./gateway-layer/Dockerfile
+      context: ./gateway-layer
+      dockerfile: Dockerfile
     container_name: gateway-layer
     depends_on:
       - rabbitmq
       - group-manage-service
     environment:
-      # Node will use this to connect to RabbitMQ
       - RABBIT_URL=amqp://guest:guest@rabbitmq:5672
-      # Might also specify your Spring Boot's URL if you proxy API calls:
       - SPRING_BOOT_URL=http://group-manage-service:8080
     ports:
       - "3000:3000"
+
 volumes:
   mysql-data:
   redis-data:
