@@ -12,8 +12,8 @@ COPY target/group-manage-service-0.0.1-SNAPSHOT.jar /app/app.jar
 # Copy the application-docker.properties file to the container
 COPY src/main/resources/application-docker.properties /app/application-docker.properties
 
-# Make port 8081 available to the world outside this container
-EXPOSE 8081
+# Make port 8080 available to the world outside this container
+EXPOSE 8080
 
 # Set environment variables to point to the Docker-specific properties file
 ENV SPRING_CONFIG_LOCATION=classpath:/application-docker.properties

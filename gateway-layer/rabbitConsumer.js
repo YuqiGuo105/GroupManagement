@@ -1,31 +1,56 @@
+// amqpConsumer.js
 const amqp = require('amqplib');
 
-const RABBIT_URL = process.env.RABBIT_URL || 'amqp://guest:guest@rabbitmq:5672';
-const EXCHANGE = 'room-exchange';  // match your Spring config
-const ROUTING_KEY = 'room.key';    // match your Spring config
+const RABBIT_URL = process.env.RABBIT_URL || 'amqp://guest:guest@localhost:5672';
+const ROOM_EXCHANGE = process.env.ROOM_EXCHANGE || 'roomExchange';
+const ROUTING_KEY   = process.env.ROUTING_KEY   || 'room.events';
+const QUEUE_NAME    = process.env.QUEUE_NAME    || 'gateway-queue';
 
-async function startConsumer() {
+async function startConsumer(io) {
   try {
     const connection = await amqp.connect(RABBIT_URL);
     const channel = await connection.createChannel();
-    await channel.assertExchange(EXCHANGE, 'topic', { durable: true });
 
-    // Create/bind your queue:
-    const queueResult = await channel.assertQueue('gateway-queue', { durable: true });
-    await channel.bindQueue(queueResult.queue, EXCHANGE, ROUTING_KEY);
+    // Ensure the exchange exists; assuming a 'topic' exchange.
+    await channel.assertExchange(ROOM_EXCHANGE, 'topic', { durable: true });
 
-    // Start consuming
-    channel.consume(queueResult.queue, (msg) => {
-      if (msg !== null) {
-        const payloadStr = msg.content.toString();
-        console.log('[RabbitMQ] Received:', payloadStr);
-        channel.ack(msg);
+    // Ensure the queue exists
+    await channel.assertQueue(QUEUE_NAME, { durable: true });
+
+    // Bind the queue to the exchange with the specified routing key
+    await channel.bindQueue(QUEUE_NAME, ROOM_EXCHANGE, ROUTING_KEY);
+    console.log(`[RabbitMQ] Bound queue "${QUEUE_NAME}" to exchange "${ROOM_EXCHANGE}" with routing key "${ROUTING_KEY}"`);
+
+    // Consume messages from the queue
+    channel.consume(QUEUE_NAME, (msg) => {
+      if (msg) {
+        const content = msg.content.toString();
+        console.log('[RabbitMQ] Received message:', content);
+
+        try {
+          // Parse the JSON payload from group-manage-service
+          const payload = JSON.parse(content);
+          // Expected payload format: { eventType: "USER_LEFT", roomId: "...", userId: "..." }
+          if (payload && payload.roomId && payload.eventType) {
+            // Broadcast the event to clients in the specified room
+            io.to(payload.roomId).emit(payload.eventType, payload);
+            console.log(`[Socket.IO] Emitted event "${payload.eventType}" to room "${payload.roomId}"`);
+          } else {
+            console.warn('[RabbitMQ] Payload missing roomId or eventType:', payload);
+          }
+          // Acknowledge the message
+          channel.ack(msg);
+        } catch (err) {
+          console.error('[RabbitMQ] Error processing message:', err);
+          // Acknowledge even on error to prevent requeue loop
+          channel.ack(msg);
+        }
       }
     }, { noAck: false });
 
-    console.log('[RabbitMQ] Consumer started');
-  } catch (err) {
-    console.error('[RabbitMQ] Error:', err);
+    console.log('[RabbitMQ] Consumer started. Waiting for messages...');
+  } catch (error) {
+    console.error('[RabbitMQ] Connection/Consumption error:', error);
   }
 }
 

@@ -39,7 +39,7 @@ services:
     container_name: group-manage-service
     environment:
       - SPRING_APPLICATION_NAME=group-manage-service
-      - SERVER_PORT=8081
+      - SERVER_PORT=8080
       # Datasource properties pointing to the MySQL container by name
       - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/yourdatabase
       - SPRING_DATASOURCE_USERNAME=root
