@@ -1,4 +1,5 @@
 version: '3.8'
+
 services:
   mysql:
     image: mysql:8.0
@@ -10,6 +11,8 @@ services:
       - "3306:3306"
     volumes:
       - mysql-data:/var/lib/mysql
+    networks:
+      - app-network
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s
@@ -17,12 +20,21 @@ services:
       retries: 5
 
   redis:
-    image: redis:alpine
+    image: docker.dragonflydb.io/dragonflydb/dragonfly:v1.13.0
     container_name: redis
+    hostname: redis
     ports:
       - "6379:6379"
+    command: [ "--logtostderr" ]
     volumes:
       - redis-data:/data
+    networks:
+      - app-network
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 3s
+      retries: 3
 
   rabbitmq:
     image: rabbitmq:3-management
@@ -31,30 +43,37 @@ services:
       - RABBITMQ_DEFAULT_USER=guest
       - RABBITMQ_DEFAULT_PASS=guest
     ports:
-      - "5672:5672"  # RabbitMQ message broker port
-      - "15672:15672"  # RabbitMQ Management UI port
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   group-manage-service:
-    build: ./group-manage-service
+    build:
+      context: ./group-manage-service
+      dockerfile: Dockerfile
     container_name: group-manage-service
-    environment:
-      - SPRING_APPLICATION_NAME=group-manage-service
-      - SERVER_PORT=8080
-      # Datasource properties pointing to the MySQL container by name
-      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/yourdatabase
-      - SPRING_DATASOURCE_USERNAME=root
-      - SPRING_DATASOURCE_PASSWORD=yourpassword
-      - SPRING_DATASOURCE_DRIVER_CLASS_NAME=com.mysql.cj.jdbc.Driver
-      - SPRING_JPA_DATABASE_PLATFORM=org.hibernate.dialect.MySQLDialect
-      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
-      # Redis properties pointing to the Redis container by name
-      - SPRING_REDIS_HOST=redis
-      - SPRING_REDIS_PORT=6379
     ports:
       - "8080:8080"
     depends_on:
-      - mysql
-      - redis
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - app-network
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/yourdatabase
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: yourpassword
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
 
   gateway-layer:
     build:
@@ -62,13 +81,21 @@ services:
       dockerfile: Dockerfile
     container_name: gateway-layer
     depends_on:
-      - rabbitmq
-      - group-manage-service
+      rabbitmq:
+        condition: service_healthy
+      group-manage-service:
+        condition: service_started
+    networks:
+      - app-network
     environment:
-      - RABBIT_URL=amqp://guest:guest@rabbitmq:5672
-      - SPRING_BOOT_URL=http://group-manage-service:8080
+      RABBIT_URL: amqp://guest:guest@rabbitmq:5672
+      SPRING_BOOT_URL: http://group-manage-service:8080
     ports:
       - "3000:3000"
+
+networks:
+  app-network:
+    driver: bridge
 
 volumes:
   mysql-data:
