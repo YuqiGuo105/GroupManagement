@@ -7,7 +7,14 @@ function getProxyConfig() {
     target: SPRING_BOOT_URL,
     changeOrigin: true,
     pathRewrite: { '^/api': '/api' },
-    logLevel: 'debug'
+    logLevel: 'debug',
+    timeout: 500, // Short timeout to trigger gateway timeout quickly
+    onError: (err, req, res) => {
+      res.writeHead(504, {
+        'Content-Type': 'text/plain'
+      });
+      res.end('Gateway Timeout');
+    }
   };
 }
 

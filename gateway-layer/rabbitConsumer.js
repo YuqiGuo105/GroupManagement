@@ -1,17 +1,19 @@
 // amqpConsumer.js
+
 const amqp = require('amqplib');
+const sseHandler = require('./sseHandler');
 
 const RABBIT_URL = process.env.RABBIT_URL || 'amqp://guest:guest@localhost:5672';
 const ROOM_EXCHANGE = process.env.ROOM_EXCHANGE || 'roomExchange';
 const ROUTING_KEY   = process.env.ROUTING_KEY   || 'room.events';
 const QUEUE_NAME    = process.env.QUEUE_NAME    || 'gateway-queue';
 
-async function startConsumer(io) {
+async function startConsumer() {
   try {
     const connection = await amqp.connect(RABBIT_URL);
     const channel = await connection.createChannel();
 
-    // Ensure the exchange exists; assuming a 'topic' exchange.
+    // Ensure the exchange exists (assuming a 'topic' exchange)
     await channel.assertExchange(ROOM_EXCHANGE, 'topic', { durable: true });
 
     // Ensure the queue exists
@@ -28,13 +30,13 @@ async function startConsumer(io) {
         console.log('[RabbitMQ] Received message:', content);
 
         try {
-          // Parse the JSON payload from group-manage-service
+          // Parse the JSON payload
           const payload = JSON.parse(content);
           // Expected payload format: { eventType: "USER_LEFT", roomId: "...", userId: "..." }
           if (payload && payload.roomId && payload.eventType) {
-            // Broadcast the event to clients in the specified room
-            io.to(payload.roomId).emit(payload.eventType, payload);
-            console.log(`[Socket.IO] Emitted event "${payload.eventType}" to room "${payload.roomId}"`);
+            // Broadcast the event to clients subscribed to the specified room
+            sseHandler.broadcast(payload, payload.roomId);
+            console.log(`[SSE] Emitted event "${payload.eventType}" to room "${payload.roomId}"`);
           } else {
             console.warn('[RabbitMQ] Payload missing roomId or eventType:', payload);
           }
@@ -42,7 +44,7 @@ async function startConsumer(io) {
           channel.ack(msg);
         } catch (err) {
           console.error('[RabbitMQ] Error processing message:', err);
-          // Acknowledge even on error to prevent requeue loop
+          // Acknowledge the message to prevent a requeue loop
           channel.ack(msg);
         }
       }
@@ -53,5 +55,7 @@ async function startConsumer(io) {
     console.error('[RabbitMQ] Connection/Consumption error:', error);
   }
 }
+
+startConsumer();
 
 module.exports = { startConsumer };
