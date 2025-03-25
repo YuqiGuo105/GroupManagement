@@ -13,10 +13,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.amqp.core.AmqpTemplate;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Optional;
-import java.util.Random;
-import java.util.UUID;
+import java.util.*;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -24,6 +22,9 @@ import org.slf4j.LoggerFactory;
 public class RoomService {
     @Autowired
     private RoomRepository roomRepository;
+
+    @Autowired
+    private ParticipantService participantService;
 
     @Autowired
     private AmqpTemplate amqpTemplate;
@@ -85,6 +86,9 @@ public class RoomService {
         room.getParticipants().size();
         room.setStatus(Room.Status.CLOSED);
         room.getParticipants().clear();
+
+        publishEvent(EventType.ROOM_CLOSED, roomId, hoster);
+
         return roomRepository.save(room);
     }
 
@@ -124,6 +128,80 @@ public class RoomService {
     @CacheEvict(value = "rooms", key = "#roomId")
     public void deleteRoom(String roomId) {
         roomRepository.deleteById(roomId);
+    }
+
+    /**
+     * Validates the join credentials and adds the user as a participant.
+     */
+    @Transactional
+    public String joinRoom(String roomId, String password, String userId) {
+        Room room = getRoomWithParticipants(roomId);
+        if (room == null) {
+            throw new IllegalArgumentException("Room not found");
+        }
+        if (!room.getJoinPassword().equals(password) || room.getStatus() != Room.Status.ACTIVE) {
+            throw new IllegalArgumentException("Invalid password or room not active");
+        }
+        boolean alreadyIn = room.getParticipants().stream()
+                .anyMatch(p -> p.getId().getUserId().equals(userId));
+        if (alreadyIn) {
+            throw new IllegalStateException("User already in room");
+        }
+        Participant newParticipant = new Participant();
+        newParticipant.setId(new ParticipantId(userId, roomId));
+        newParticipant.setPermission(Participant.Permission.PARTICIPANT);
+        newParticipant.setRoom(room);
+        participantService.updateParticipant(newParticipant);
+        room.getParticipants().add(newParticipant);
+        updateRoom(room);
+        publishEvent(EventType.USER_JOINED, roomId, userId);
+        return "User joined room successfully";
+    }
+
+    /**
+     * Removes the participant from the room. If the host leaves, reassigns the host or closes the room if empty.
+     */
+    @Transactional
+    public String leaveRoom(String roomId, String userId) {
+        Room room = getRoomWithParticipants(roomId);
+        if (room == null) {
+            throw new IllegalArgumentException("Room not found");
+        }
+        Optional<Participant> participantOpt = room.getParticipants().stream()
+                .filter(p -> p.getId().getUserId().equals(userId))
+                .findFirst();
+        if (!participantOpt.isPresent()) {
+            throw new IllegalArgumentException("User not in room");
+        }
+        Participant participant = participantOpt.get();
+        room.getParticipants().remove(participant);
+        participantService.deleteParticipant(roomId, userId);
+        if (participant.getPermission() == Participant.Permission.HOSTER) {
+            if (!room.getParticipants().isEmpty()) {
+                Participant newHost = room.getParticipants().get(0);
+                newHost.setPermission(Participant.Permission.HOSTER);
+                room.setHosterUserId(newHost.getId().getUserId());
+                participantService.updateParticipant(newHost);
+                publishEvent(EventType.HOST_CHANGE, roomId, newHost.getId().getUserId());
+            } else {
+                room.setStatus(Room.Status.CLOSED);
+                room.getParticipants().clear();
+                updateRoom(room);
+                publishEvent(EventType.ROOM_CLOSED, roomId, userId);
+                deleteRoom(roomId);
+                return "Room deleted as it is empty";
+            }
+        }
+        updateRoom(room);
+        publishEvent(EventType.USER_LEFT, roomId, userId);
+        return "User left room successfully";
+    }
+
+    /**
+     * Retrieves all rooms.
+     */
+    public List<Room> getAllRooms() {
+        return roomRepository.findAll();
     }
 
     /**

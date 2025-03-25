@@ -18,6 +18,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Optional;
 
 @RestController
@@ -63,33 +64,19 @@ public class RoomController {
             @Parameter(description = "Room ID", required = true) @RequestParam String roomId,
             @Parameter(description = "Join password for the room", required = true) @RequestParam String password,
             @Parameter(description = "User ID joining the room", required = true) @RequestParam String userId) {
-        // Load the room with initialized participants.
-        Room room = roomService.getRoomWithParticipants(roomId);
-        if (room == null) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Room not found");
+        try {
+            String message = roomService.joinRoom(roomId, password, userId);
+            return ResponseEntity.ok(message);
+        } catch (IllegalArgumentException ex) {
+            if ("Room not found".equals(ex.getMessage())) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ex.getMessage());
+            } else if ("Invalid password or room not active".equals(ex.getMessage())) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ex.getMessage());
+            }
+            return ResponseEntity.badRequest().body(ex.getMessage());
+        } catch (IllegalStateException ex) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(ex.getMessage());
         }
-        if (!room.getJoinPassword().equals(password) || room.getStatus() != Room.Status.ACTIVE) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Invalid password or room not active");
-        }
-        boolean alreadyIn = room.getParticipants().stream()
-                .anyMatch(p -> p.getId().getUserId().equals(userId));
-        if (alreadyIn) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).body("User already in room");
-        }
-        // Create a new Participant (this method will insert it into the DB)
-        Participant newParticipant = new Participant();
-        newParticipant.setId(new ParticipantId(userId, roomId));
-        newParticipant.setPermission(Participant.Permission.PARTICIPANT);
-        newParticipant.setRoom(room);
-        participantService.updateParticipant(newParticipant);
-        // Add participant to the room and update the room in DB/cache
-        room.getParticipants().add(newParticipant);
-        roomService.updateRoom(room);
-
-        // Publish the USER_JOINED event
-        roomService.publishEvent(EventType.USER_JOINED, roomId, userId);
-
-        return ResponseEntity.ok("User joined room successfully");
     }
 
     // ------------------------------
@@ -105,48 +92,12 @@ public class RoomController {
     public ResponseEntity<String> leaveRoom(
             @Parameter(description = "Room ID", required = true) @RequestParam String roomId,
             @Parameter(description = "User ID leaving the room", required = true) @RequestParam String userId) {
-        Room room = roomService.getRoomWithParticipants(roomId);
-        if (room == null) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Room not found");
+        try {
+            String message = roomService.leaveRoom(roomId, userId);
+            return ResponseEntity.ok(message);
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ex.getMessage());
         }
-        // Find the participant in the room
-        Optional<Participant> participantOpt = room.getParticipants().stream()
-                .filter(p -> p.getId().getUserId().equals(userId))
-                .findFirst();
-        if (!participantOpt.isPresent()) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not in room");
-        }
-        Participant participant = participantOpt.get();
-        // Remove participant from room and delete from DB/cache
-        room.getParticipants().remove(participant);
-        participantService.deleteParticipant(roomId, userId);
-        // If the leaving participant is the host, reassign host or delete room if no one remains
-        if (participant.getPermission() == Participant.Permission.HOSTER) {
-            if (!room.getParticipants().isEmpty()) {
-                Participant newHost = room.getParticipants().get(0);
-                newHost.setPermission(Participant.Permission.HOSTER);
-                room.setHosterUserId(newHost.getId().getUserId());
-                participantService.updateParticipant(newHost);
-
-                // Publish HOST_CHANGE event for the new host
-                roomService.publishEvent(EventType.HOST_CHANGE, roomId, newHost.getId().getUserId());
-            } else {
-                room.setStatus(Room.Status.CLOSED);
-                room.getParticipants().clear();
-                roomService.updateRoom(room);
-
-                // Publish ROOM_CLOSED event as room is empty
-                roomService.publishEvent(EventType.ROOM_CLOSED, roomId, userId);
-
-                return ResponseEntity.ok("Room deleted as it is empty");
-            }
-        }
-
-        roomService.updateRoom(room);
-        // For non-host leaving, publish USER_LEFT event
-        roomService.publishEvent(EventType.USER_LEFT, roomId, userId);
-
-        return ResponseEntity.ok("User left room successfully");
     }
 
     // ------------------------------
@@ -163,11 +114,7 @@ public class RoomController {
             @Parameter(description = "Room ID", required = true) @RequestParam String roomId,
             @Parameter(description = "User ID of the host", required = true) @RequestParam String hoster) {
         try {
-            Room updatedRoom = roomService.closeRoom(roomId, hoster);
-
-            // Publish ROOM_CLOSED event
-            roomService.publishEvent(EventType.ROOM_CLOSED, roomId, hoster);
-
+            roomService.closeRoom(roomId, hoster);
             return ResponseEntity.ok("Room closed successfully");
         } catch (IllegalArgumentException ex) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ex.getMessage());
@@ -230,5 +177,19 @@ public class RoomController {
             @Parameter(description = "Room ID", required = true) @PathVariable String roomId) {
         roomService.deleteRoom(roomId);
         return ResponseEntity.noContent().build();
+    }
+
+    // ------------------------------
+    // Get All Rooms – new endpoint to retrieve all rooms.
+    // ------------------------------
+    @Operation(summary = "Get All Rooms", description = "Retrieve all rooms.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "All rooms retrieved successfully",
+                    content = @Content(schema = @Schema(implementation = Room.class)))
+    })
+    @GetMapping
+    public ResponseEntity<List<Room>> getAllRooms() {
+        List<Room> rooms = roomService.getAllRooms();
+        return ResponseEntity.ok(rooms);
     }
 }
