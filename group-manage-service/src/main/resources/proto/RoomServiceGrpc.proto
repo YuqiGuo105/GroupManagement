@@ -1,0 +1,63 @@
+syntax = "proto3";
+
+package room;
+
+option java_multiple_files = true;
+option java_package = "org.example.groupmanageservice.grpc";
+option java_outer_classname = "RoomServiceProto";
+
+service RoomService {
+  rpc CreateRoom(CreateRoomRequest) returns (CreateRoomResponse);
+  rpc CloseRoom(CloseRoomRequest) returns (CloseRoomResponse);
+  rpc GetRoom(GetRoomRequest) returns (GetRoomResponse);
+  rpc JoinRoom(JoinRoomRequest) returns (JoinRoomResponse);
+  rpc LeaveRoom(LeaveRoomRequest) returns (LeaveRoomResponse);
+}
+
+message CreateRoomRequest {
+  string hosterUserId = 1;
+}
+
+message CreateRoomResponse {
+  string roomId = 1;
+  string joinPassword = 2;
+}
+
+message CloseRoomRequest {
+  string roomId = 1;
+  string hosterUserId = 2;
+}
+
+message CloseRoomResponse {
+  string message = 1;
+}
+
+message GetRoomRequest {
+  string roomId = 1;
+}
+
+message GetRoomResponse {
+  string roomId = 1;
+  string hosterUserId = 2;
+  string joinPassword = 3;
+  string status = 4;
+}
+
+message JoinRoomRequest {
+  string roomId = 1;
+  string password = 2;
+  string userId = 3;
+}
+
+message JoinRoomResponse {
+  string message = 1;
+}
+
+message LeaveRoomRequest {
+  string roomId = 1;
+  string userId = 2;
+}
+
+message LeaveRoomResponse {
+  string message = 1;
+}

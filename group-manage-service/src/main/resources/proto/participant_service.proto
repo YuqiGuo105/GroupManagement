@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package participant;
+
+option java_package = "org.example.groupmanageservice.grpc";
+option java_outer_classname = "ParticipantServiceProto";
+
+service ParticipantService {
+  rpc GetParticipant(GetParticipantRequest) returns (GetParticipantResponse);
+  rpc UpdateParticipant(UpdateParticipantRequest) returns (UpdateParticipantResponse);
+  rpc DeleteParticipant(DeleteParticipantRequest) returns (DeleteParticipantResponse);
+}
+
+message GetParticipantRequest {
+  string roomId = 1;
+  string userId = 2;
+}
+
+message GetParticipantResponse {
+  string roomId = 1;
+  string userId = 2;
+  // You can add additional fields such as permission if needed.
+}
+
+message UpdateParticipantRequest {
+  string roomId = 1;
+  string userId = 2;
+  // Include additional fields to update if necessary.
+}
+
+message UpdateParticipantResponse {
+  string message = 1;
+}
+
+message DeleteParticipantRequest {
+  string roomId = 1;
+  string userId = 2;
+}
+
+message DeleteParticipantResponse {
+  string message = 1;
+}
