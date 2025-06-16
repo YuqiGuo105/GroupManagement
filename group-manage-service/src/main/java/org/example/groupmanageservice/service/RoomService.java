@@ -54,7 +54,8 @@ public class RoomService {
         // Create host Participant and add to room's participant list
         Participant host = new Participant();
         host.setId(new ParticipantId(hosterUserId, roomId));
-        host.setPermission(Participant.Permission.HOSTER);
+        host.setRole(Participant.Role.HOSTER);
+        host.setPermission(Participant.Permission.READ_WRITE);
         host.setRoom(room);
         ArrayList<Participant> participants = new ArrayList<>();
         participants.add(host);
@@ -149,7 +150,8 @@ public class RoomService {
         }
         Participant newParticipant = new Participant();
         newParticipant.setId(new ParticipantId(userId, roomId));
-        newParticipant.setPermission(Participant.Permission.PARTICIPANT);
+        newParticipant.setRole(Participant.Role.PARTICIPANT);
+        newParticipant.setPermission(Participant.Permission.READ);
         newParticipant.setRoom(room);
         participantService.updateParticipant(newParticipant);
         room.getParticipants().add(newParticipant);
@@ -176,10 +178,11 @@ public class RoomService {
         Participant participant = participantOpt.get();
         room.getParticipants().remove(participant);
         participantService.deleteParticipant(roomId, userId);
-        if (participant.getPermission() == Participant.Permission.HOSTER) {
+        if (participant.getRole() == Participant.Role.HOSTER) {
             if (!room.getParticipants().isEmpty()) {
                 Participant newHost = room.getParticipants().get(0);
-                newHost.setPermission(Participant.Permission.HOSTER);
+                newHost.setRole(Participant.Role.HOSTER);
+                newHost.setPermission(Participant.Permission.READ_WRITE);
                 room.setHosterUserId(newHost.getId().getUserId());
                 participantService.updateParticipant(newHost);
                 publishEvent(EventType.HOST_CHANGE, roomId, newHost.getId().getUserId());

@@ -26,6 +26,11 @@ public class Participant implements Serializable {
     private ParticipantId id;
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "role")
+    private Role role;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "permission")
     private Permission permission;
 
     // Remove any redundant field like "private String roomId;"—the id already contains roomId.
@@ -36,7 +41,11 @@ public class Participant implements Serializable {
     @JsonBackReference
     private Room room;
 
-    public enum Permission {
+    public enum Role {
         HOSTER, PARTICIPANT
+    }
+
+    public enum Permission {
+        READ, WRITE, READ_WRITE
     }
 }
