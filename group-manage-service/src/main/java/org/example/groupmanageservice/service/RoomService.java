@@ -201,6 +201,36 @@ public class RoomService {
     }
 
     /**
+     * Removes a participant from the room. Only the current host can perform this action.
+     */
+    @Transactional
+    public String removeParticipant(String roomId, String hoster, String userId) {
+        Room room = getRoomWithParticipants(roomId);
+        if (room == null) {
+            throw new IllegalArgumentException("Room not found");
+        }
+        if (!room.getHosterUserId().equals(hoster)) {
+            throw new IllegalArgumentException("Only the host can remove participants");
+        }
+        if (hoster.equals(userId)) {
+            throw new IllegalArgumentException("Host cannot remove themselves");
+        }
+
+        Optional<Participant> participantOpt = room.getParticipants().stream()
+                .filter(p -> p.getId().getUserId().equals(userId))
+                .findFirst();
+        if (participantOpt.isEmpty()) {
+            throw new IllegalArgumentException("User not in room");
+        }
+        Participant participant = participantOpt.get();
+        room.getParticipants().remove(participant);
+        participantService.deleteParticipant(roomId, userId);
+        updateRoom(room);
+        publishEvent(EventType.USER_LEFT, roomId, userId);
+        return "Participant removed successfully";
+    }
+
+    /**
      * Retrieves all rooms.
      */
     public List<Room> getAllRooms() {
