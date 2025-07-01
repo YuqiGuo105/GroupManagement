@@ -1,6 +1,16 @@
-# Getting Started with Create React App
+# Frontend
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+This React application communicates with the backend services via the gateway. It uses
+Firebase for authentication and React Router for navigation.
+
+Create a `.env` file in this folder and provide your Firebase configuration:
+
+```
+REACT_APP_FIREBASE_API_KEY=yourKey
+REACT_APP_FIREBASE_AUTH_DOMAIN=yourDomain
+REACT_APP_FIREBASE_PROJECT_ID=yourProject
+REACT_APP_FIREBASE_APP_ID=yourAppId
+```
 
 ## Available Scripts
 
