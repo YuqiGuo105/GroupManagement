@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useCallback, useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { auth } from '../firebase';
 import { getRoom, leaveRoom } from '../api';
 
@@ -8,6 +8,16 @@ export default function RoomPage() {
   const [room, setRoom] = useState(null);
   const [events, setEvents] = useState([]);
   const user = auth.currentUser;
+  const navigate = useNavigate();
+
+  const fetchRoom = useCallback(async () => {
+    try {
+      const r = await getRoom(roomId);
+      setRoom(r);
+    } catch (err) {
+      console.error(err);
+    }
+  }, [roomId]);
 
   useEffect(() => {
     fetchRoom();
@@ -17,20 +27,12 @@ export default function RoomPage() {
       setEvents((prev) => [...prev, data]);
     };
     return () => es.close();
-  }, [roomId]);
-
-  const fetchRoom = async () => {
-    try {
-      const r = await getRoom(roomId);
-      setRoom(r);
-    } catch (err) {
-      console.error(err);
-    }
-  };
+  }, [roomId, fetchRoom]);
 
   const handleLeave = async () => {
     try {
       await leaveRoom(roomId, user.uid);
+      navigate('/');
     } catch (err) {
       alert(err.message);
     }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth } from '../firebase';
 import { createRoom, joinRoom, leaveRoom, getAllRooms } from '../api';
@@ -12,16 +12,16 @@ export default function Home() {
 
   const user = auth.currentUser;
 
-  useEffect(() => { if (user) fetchRooms(); }, [user]);
-
-  const fetchRooms = async () => {
+  const fetchRooms = useCallback(async () => {
     try {
       const data = await getAllRooms();
       setRooms(data);
     } catch (err) {
       console.error(err);
     }
-  };
+  }, []);
+
+  useEffect(() => { if (user) fetchRooms(); }, [user, fetchRooms]);
 
   const handleCreate = async () => {
     try {
