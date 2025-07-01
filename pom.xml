@@ -11,6 +11,7 @@
     <modules>
         <module>group-manage-service</module>
         <module>gateway-layer</module>
+        <module>frontend</module>
     </modules>
 
     <properties>
