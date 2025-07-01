@@ -27,7 +27,11 @@ public class Room implements Serializable {
     @Enumerated(EnumType.STRING)
     private Status status;
 
+    // Use plain DATETIME to stay compatible with older MySQL versions
+    @Column(columnDefinition = "DATETIME")
     private LocalDateTime createdAt;
+
+    @Column(columnDefinition = "DATETIME")
     private LocalDateTime updatedAt;
 
     // Use lazy fetching (or eager if small), but use JsonManagedReference to break recursion.
