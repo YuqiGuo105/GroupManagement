@@ -1,0 +1,114 @@
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:wght@400;600;700&family=Space+Grotesk:wght@400;500;600&display=swap");
+
+:root {
+  color-scheme: light;
+  font-family: "Fraunces", "Georgia", serif;
+  background: radial-gradient(circle at top, #f8f1e1 0%, #f3e1c6 45%, #e7cfad 100%);
+  color: #2b2016;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+.page {
+  min-height: 100vh;
+  padding: 5rem 8vw 6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 3rem;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.65), rgba(255, 245, 230, 0.4));
+}
+
+.hero {
+  max-width: 720px;
+  display: grid;
+  gap: 1rem;
+  animation: rise 0.8s ease-out;
+}
+
+.eyebrow {
+  font-family: "Space Grotesk", "Trebuchet MS", sans-serif;
+  letter-spacing: 0.3rem;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  margin: 0;
+}
+
+.hero h1 {
+  font-size: clamp(2.8rem, 4vw, 4.4rem);
+  margin: 0;
+}
+
+.lead {
+  font-family: "Space Grotesk", "Trebuchet MS", sans-serif;
+  font-size: 1.1rem;
+  margin: 0;
+}
+
+.actions {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+button {
+  font-family: "Space Grotesk", "Trebuchet MS", sans-serif;
+  border-radius: 999px;
+  padding: 0.7rem 1.6rem;
+  border: none;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+
+button.primary {
+  background: #2b2016;
+  color: #f6eee2;
+}
+
+button.ghost {
+  background: transparent;
+  color: #2b2016;
+  border: 1px solid #2b2016;
+}
+
+.grid {
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  animation: rise 0.8s ease-out 0.2s both;
+}
+
+.grid article {
+  padding: 1.5rem;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 1.25rem;
+  box-shadow: 0 20px 35px rgba(64, 37, 16, 0.12);
+}
+
+@keyframes rise {
+  from {
+    transform: translateY(16px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@media (max-width: 720px) {
+  .page {
+    padding: 3rem 6vw 4rem;
+  }
+
+  .actions {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

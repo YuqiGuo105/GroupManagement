@@ -1,0 +1,14 @@
+spring:
+  application:
+    name: GroupManagement
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/group_management}
+    username: ${SPRING_DATASOURCE_USERNAME:group_management}
+    password: ${SPRING_DATASOURCE_PASSWORD:group_management}
+  jpa:
+    hibernate:
+      ddl-auto: update
+  data:
+    redis:
+      host: ${SPRING_REDIS_HOST:localhost}
+      port: ${SPRING_REDIS_PORT:6379}
